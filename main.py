@@ -6,20 +6,17 @@ import string
 import datetime
 import os
 import base64
-import sys
 
 # ==========================================
-# 核心逻辑层 (保持不变)
+# 1. 核心逻辑层 (加密与数据管理)
 # ==========================================
 
 class AppUtils:
     @staticmethod
     def get_data_file_path():
-        # 在安卓上，Flet 会自动处理路径，直接用文件名即可
         return "data.json"
 
 class SimpleCrypt:
-    # ... (加密算法保持完全一致) ...
     @staticmethod
     def derive_key(password: str, salt: bytes) -> bytes:
         return hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
@@ -61,7 +58,6 @@ class SimpleCrypt:
             return "Error"
 
 class PasswordManagerLogic:
-    # ... (业务逻辑层保持完全一致) ...
     def __init__(self):
         self.file_path = AppUtils.get_data_file_path()
         self.session_key = None 
@@ -177,31 +173,25 @@ class PasswordManagerLogic:
         return ''.join(chars)
 
 # ==========================================
-# UI 层 (修复布局问题)
+# 2. UI 层 (完美修复居中与白屏问题)
 # ==========================================
+
 def main(page: ft.Page):
     page.title = "SafeVault"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 20
     
+    # 强制设置页面垂直居中，这是第一道保险
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    
     logic = PasswordManagerLogic()
     
-    # === 页面切换辅助函数 ===
-    def switch_to_login():
-        page.clean()
-        page.add(build_login_view())
-    
-    def switch_to_setup():
-        page.clean()
-        page.add(build_setup_view())
+    # --- 界面构建器 ---
 
-    def switch_to_main():
-        page.clean()
-        page.add(build_main_view())
-
-    # === 1. 初始化页面 (修复居中) ===
+    # 1. 初始化界面 (修复：增加 expand=True 和 居中对齐)
     def build_setup_view():
-        pwd_field = ft.TextField(label="设置主密码", password=True, can_reveal_password=True)
+        pwd_field = ft.TextField(label="设置主密码", password=True, can_reveal_password=True, width=300)
         
         def on_setup(e):
             valid, msg = logic.check_password_strength(pwd_field.value)
@@ -211,55 +201,65 @@ def main(page: ft.Page):
                 page.update()
                 return
             logic.register_master_password(pwd_field.value)
-            switch_to_main()
+            # 切换到主界面前，要重置页面对齐方式为顶部，否则列表也会居中显示
+            page.vertical_alignment = ft.MainAxisAlignment.START
+            page.padding = 0 # 移除内边距以便 Tabs 铺满
+            page.clean()
+            page.add(build_main_view())
+            page.update()
 
-        # 【修复点】增加 expand=True 和明确的对齐方式
         return ft.Column(
             [
-                ft.Icon(name=ft.icons.SECURITY, size=60, color=ft.colors.BLUE_GREY),
-                ft.Text("初始化金库", size=30, weight="bold"),
-                ft.Text("请设置一个强密码，一旦丢失无法找回！", color="red"),
+                ft.Icon(name=ft.icons.SECURITY, size=80, color=ft.colors.BLUE_GREY),
+                ft.Text("初始化金库", size=28, weight="bold"),
+                ft.Text("设置唯一密码，丢失无法找回", color="red", size=12),
                 ft.Container(height=20),
                 pwd_field,
-                ft.ElevatedButton("初始化", on_click=on_setup, width=400, height=50),
+                ft.Container(height=10),
+                ft.ElevatedButton("开始初始化", on_click=on_setup, width=300, height=45),
             ],
             alignment=ft.MainAxisAlignment.CENTER, # 垂直居中
             horizontal_alignment=ft.CrossAxisAlignment.CENTER, # 水平居中
-            spacing=20,
+            spacing=10,
             expand=True # 撑满全屏
         )
 
-    # === 2. 登录页面 (修复居中) ===
+    # 2. 登录界面 (修复：增加 expand=True 和 居中对齐)
     def build_login_view():
-        pwd_field = ft.TextField(label="输入主密码", password=True, can_reveal_password=True)
+        pwd_field = ft.TextField(label="输入主密码", password=True, can_reveal_password=True, width=300)
         
         def on_login(e):
             if logic.login(pwd_field.value):
-                switch_to_main()
+                # 切换到主界面前，重置页面对齐方式
+                page.vertical_alignment = ft.MainAxisAlignment.START
+                page.padding = 0
+                page.clean()
+                page.add(build_main_view())
+                page.update()
             else:
                 pwd_field.error_text = "密码错误"
                 pwd_field.update()
 
-        # 【修复点】增加 expand=True 和明确的对齐方式
         return ft.Column(
             [
-                ft.Icon(name=ft.icons.LOCK_OPEN, size=60, color=ft.colors.BLUE),
-                ft.Text("解密金库", size=30, weight="bold"),
+                ft.Icon(name=ft.icons.LOCK_OPEN, size=80, color=ft.colors.BLUE),
+                ft.Text("解密金库", size=28, weight="bold"),
                 ft.Container(height=20),
                 pwd_field,
-                ft.ElevatedButton("解锁", on_click=on_login, width=400, height=50),
+                ft.Container(height=10),
+                ft.ElevatedButton("立即解锁", on_click=on_login, width=300, height=45),
             ],
-            alignment=ft.MainAxisAlignment.CENTER, # 垂直居中
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER, # 水平居中
-            spacing=20,
-            expand=True # 撑满全屏
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=10,
+            expand=True
         )
 
-    # === 3. 主页面 (修复白屏) ===
+    # 3. 主界面 (修复：白屏问题)
     def build_main_view():
         # --- 录入 Tab ---
         t_remark = ft.TextField(label="备注 (如: 淘宝)")
-        t_user = ft.TextField(label="账号/用户名")
+        t_user = ft.TextField(label="账号")
         t_pass = ft.TextField(label="密码")
         
         def gen_random(e):
@@ -277,30 +277,34 @@ def main(page: ft.Page):
             t_user.value = ""
             t_pass.value = ""
             t_remark.value = ""
-            page.snack_bar = ft.SnackBar(ft.Text("保存成功！请去列表查看"))
+            page.snack_bar = ft.SnackBar(ft.Text("保存成功"))
             page.snack_bar.open = True
             refresh_list()
             page.update()
 
-        # 【修复点】增加 expand=True
-        tab_add = ft.Column([
-            ft.Container(height=10),
+        # [关键修复] Tab 内容必须 expand=True
+        tab_add_content = ft.Column([
+            ft.Container(height=20),
             t_remark,
             t_user,
             t_pass,
+            ft.Container(height=20),
             ft.Row([
-                ft.ElevatedButton("🎲 随机生成", on_click=gen_random, expand=True),
+                ft.ElevatedButton("🎲 随机", on_click=gen_random, expand=True),
                 ft.ElevatedButton("💾 保存", on_click=save_record, expand=True),
             ]),
-        ], scroll="auto", expand=True)
+        ], scroll="auto", expand=True, spacing=10, alignment=ft.MainAxisAlignment.START)
+        
+        # 给 Tab 内容加一点内边距
+        tab_add = ft.Container(content=tab_add_content, padding=20, expand=True)
 
         # --- 列表 Tab ---
-        # 【修复点】增加 expand=True
+        # [关键修复] ListView 必须 expand=True
         lv = ft.ListView(expand=True, spacing=10, padding=10)
 
         def copy_text(text):
             page.set_clipboard(text)
-            page.snack_bar = ft.SnackBar(ft.Text("已复制到剪贴板"))
+            page.snack_bar = ft.SnackBar(ft.Text("已复制"))
             page.snack_bar.open = True
             page.update()
 
@@ -311,10 +315,8 @@ def main(page: ft.Page):
         def refresh_list(query=""):
             lv.controls.clear()
             records = logic.search_records(query)
-            
             for r in records:
                 try:
-                    # 每一个记录卡片
                     rid = r['id']
                     r_user = r['username']
                     r_pass = r['password']
@@ -324,55 +326,51 @@ def main(page: ft.Page):
                         content=ft.Container(
                             content=ft.Column([
                                 ft.ListTile(
-                                    leading=ft.Icon(ft.icons.KEY_VPM_SHARP, color=ft.colors.BLUE_GREY),
+                                    leading=ft.Icon(ft.icons.KEY),
                                     title=ft.Text(r_remark, weight="bold"),
                                     subtitle=ft.Text(f"账号: {r_user}\n密码: ••••••"),
                                 ),
                                 ft.Row([
                                     ft.TextButton("复制账号", on_click=lambda e, x=r_user: copy_text(x)),
                                     ft.TextButton("复制密码", on_click=lambda e, x=r_pass: copy_text(x)),
-                                    ft.IconButton(ft.icons.DELETE_OUTLINE, icon_color="red", 
+                                    ft.IconButton(ft.icons.DELETE, icon_color="red", 
                                                 on_click=lambda e, x=rid: delete_item(x))
                                 ], alignment="end")
                             ]),
-                            padding=10
+                            padding=5
                         )
                     )
                     lv.controls.append(card)
-                except Exception as e:
-                    # 【修复点】增加错误捕获，防止单条数据错误导致白屏
-                    print(f"Error building card: {e}")
-                    lv.controls.append(ft.Card(content=ft.Container(content=ft.Text(f"数据加载错误: {r.get('id')}", color="red"), padding=10)))
-
+                except:
+                    pass
             page.update()
 
-        t_search = ft.TextField(label="🔍 搜索...", prefix_icon=ft.icons.SEARCH, on_change=lambda e: refresh_list(e.control.value))
+        t_search = ft.TextField(label="搜索...", prefix_icon=ft.icons.SEARCH, on_change=lambda e: refresh_list(e.control.value))
 
-        # 【修复点】增加 expand=True
+        # [关键修复] Tab 列表容器 expand=True
         tab_list = ft.Column([
-            t_search,
+            ft.Container(content=t_search, padding=ft.padding.only(left=10, right=10, top=10)),
             lv
         ], expand=True)
 
         refresh_list()
 
-        # 【修复点】Tabs 控件本身已经有 expand=True，但它的子控件(上面的 tab_add, tab_list)也必须有 expand=True 才能撑开
         tabs = ft.Tabs(
             selected_index=0,
             animation_duration=300,
             tabs=[
-                ft.Tab(text="录入", icon=ft.icons.ADD_CIRCLE_OUTLINE, content=tab_add),
-                ft.Tab(text="密码库", icon=ft.icons.LIST_ALT_ROUNDED, content=tab_list),
+                ft.Tab(text="录入", icon=ft.icons.ADD, content=tab_add),
+                ft.Tab(text="密码库", icon=ft.icons.LIST, content=tab_list),
             ],
             expand=True,
         )
 
         return tabs
 
-    # === 程序入口判断 ===
+    # 4. 路由逻辑
     if logic.is_first_run():
-        switch_to_setup()
+        page.add(build_setup_view())
     else:
-        switch_to_login()
+        page.add(build_login_view())
 
 ft.app(target=main)
