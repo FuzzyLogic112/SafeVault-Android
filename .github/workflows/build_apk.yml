@@ -1,4 +1,4 @@
-name: Build Android APK with Icon
+name: Build Android APK (Fixed)
 
 on:
   push:
@@ -32,13 +32,15 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install -r requirements.txt
           pip install flet
 
-      # === 关键修改：在这里添加了 --icon icon.png ===
+      # === 修正部分开始 ===
+      # 1. 参数名修正：--project-name 改为 --project，--product-name 改为 --product
+      # 2. 移除 --icon 参数：Flet 会自动去 assets/icon.png 读取图标
       - name: Flet Build APK
         run: |
-          flet build apk --project-name SafeVault --product-name "SafeVault" --org "com.yourname.safevault" --icon icon.png
+          flet build apk --project SafeVault --product "SafeVault" --org "com.yourname.safevault"
+      # === 修正部分结束 ===
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
